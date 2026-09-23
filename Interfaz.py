@@ -198,7 +198,7 @@ class InterfazAudio(QMainWindow):
             self.canvas.draw()
             
             self.t_inicio_grabacion = time.perf_counter()
-            print(f"\n[{time.strftime('%H:%M:%S')}] --- INICIO: Comenzando a grabar audio ---")
+            print(f"\n[{time.strftime('%H:%M:%S')}] --- INICIO ---")
             self.audioCtrl.iniciarGrabacion()
         else:
             self.grabando = False
@@ -216,7 +216,7 @@ class InterfazAudio(QMainWindow):
             #Normalizamos inmediatamente para precalcular las matrices finales
             self.audioCtrl.normalizarAudio()
             t_fin_pre = time.perf_counter()
-            print(f"[{time.strftime('%H:%M:%S')}] --- Tiempo de preprocesamiento (Normalización + STFT): {t_fin_pre - t_inicio_pre:.3f} s ---")
+            print(f"[{time.strftime('%H:%M:%S')}] --- Tiempo de preprocesamiento del audio: {t_fin_pre - t_inicio_pre:.3f} s ---")
             
             #Tiempo de primera graficacion
             t_inicio_graf = time.perf_counter()
@@ -253,7 +253,7 @@ class InterfazAudio(QMainWindow):
                 self.audioCtrl.aplicarCensuraAudio(palabrasASilenciar)
                 
                 t_fin_censura = time.perf_counter()
-                print(f"[{time.strftime('%H:%M:%S')}] --- Tiempo de censura (NLP y modificación matricial): {t_fin_censura - t_inicio_censura:.3f} s ---")
+                print(f"[{time.strftime('%H:%M:%S')}] --- Tiempo de censura (NLP y modificación del audio): {t_fin_censura - t_inicio_censura:.3f} s ---")
                 
                 #Tiempo de segunda graficacion
                 t_inicio_graf2 = time.perf_counter()
@@ -270,7 +270,7 @@ class InterfazAudio(QMainWindow):
                 
             #Fin del proceso
             t_fin_total = time.perf_counter()
-            print(f"[{time.strftime('%H:%M:%S')}] --- FIN: Interfaz lista para interactuar. Tiempo total de espera del usuario: {t_fin_total - t_fin_grabacion:.3f} s ---\n")
+            print(f"[{time.strftime('%H:%M:%S')}] --- FIN. Tiempo total de espera del usuario: {t_fin_total - t_fin_grabacion:.3f} s ---\n")
 
     def cambiarModoGrafico(self, textoSeleccionado):
         """Cambia entre la vista de forma de onda y espectrograma segun el combobox"""
