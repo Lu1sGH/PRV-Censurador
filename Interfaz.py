@@ -1,16 +1,18 @@
-import sys
-import numpy as np
-from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QComboBox, QGroupBox, QSpacerItem, QSizePolicy, QGridLayout
-from PyQt5.QtGui import QIcon, QFont
-from PyQt5.QtCore import Qt, QSize
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.figure import Figure
-from AudioCtrl import AudioCtrl
-from Censurador import Censurador
-from Whisper import WhisperTranscriptor
+import sys #Manejo del sistema
+import time #Medicion de tiempos
+import numpy as np #Manejo de arreglos matematicos
+from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QComboBox, QGroupBox, QSpacerItem, QSizePolicy, QGridLayout #Elementos graficos principales
+from PyQt5.QtGui import QIcon, QFont #Iconos y fuentes
+from PyQt5.QtCore import Qt, QSize #Constantes Qt
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas #Lienzo para graficas
+from matplotlib.figure import Figure #Figura grafica
+from AudioCtrl import AudioCtrl #Controlador de audio
+from Censurador import Censurador #Procesador de texto
+from Whisper import WhisperTranscriptor #Transcriptor de voz
 
 class InterfazAudio(QMainWindow):
     def __init__(self):
+        """Inicializa la interfaz principal y sus componentes visuales y logicos"""
         super().__init__()
         self.audioCtrl = AudioCtrl()
         self.censurador = Censurador('MX')
@@ -25,14 +27,14 @@ class InterfazAudio(QMainWindow):
         layout.setContentsMargins(15, 15, 15, 15)
         self.setCentralWidget(widgetCentral)
 
-        # 1. FOCOS INDICADORES (ROJO, AZUL, VERDE)
+        #Focos indicadores rojo azul verde
         headerLayout = QHBoxLayout()
         headerLayout.setAlignment(Qt.AlignLeft)
         
         focosGrid = QGridLayout()
         focosGrid.setSpacing(10)
         
-        # Foco Rojo
+        #Foco rojo
         self.focoRojo = QLabel()
         self.focoRojo.setFixedSize(16, 16)
         labelRojo = QLabel("Grabando")
@@ -41,7 +43,7 @@ class InterfazAudio(QMainWindow):
         focosGrid.addWidget(self.focoRojo, 0, 0, alignment=Qt.AlignCenter)
         focosGrid.addWidget(labelRojo, 1, 0, alignment=Qt.AlignTop | Qt.AlignHCenter)
         
-        # Foco Azul
+        #Foco azul
         self.focoAzul = QLabel()
         self.focoAzul.setFixedSize(16, 16)
         labelAzul = QLabel("Procesando\ny censurando")
@@ -50,7 +52,7 @@ class InterfazAudio(QMainWindow):
         focosGrid.addWidget(self.focoAzul, 0, 1, alignment=Qt.AlignCenter)
         focosGrid.addWidget(labelAzul, 1, 1, alignment=Qt.AlignTop | Qt.AlignHCenter)
         
-        # Foco Verde
+        #Foco verde
         self.focoVerde = QLabel()
         self.focoVerde.setFixedSize(16, 16)
         labelVerde = QLabel("Listo")
@@ -72,7 +74,7 @@ class InterfazAudio(QMainWindow):
         
         layout.addLayout(headerLayout)
 
-        # 2. GRÁFICOS MATPLOTLIB
+        #Graficos Matplotlib
         self.figura = Figure(figsize=(6, 4))
         self.canvas = FigureCanvas(self.figura)
         self.axOriginal = self.figura.add_subplot(211)
@@ -84,7 +86,7 @@ class InterfazAudio(QMainWindow):
 
         self.modoGrafico = "onda"
 
-        # ESTILO ANALÓGICO METÁLICO PARA BOTONES
+        #Estilo analogico metalico para botones
         estiloBotonAnalogico = """
             QPushButton {
                 background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #f0f0f0, stop: 1 #a0a0a0);
@@ -103,7 +105,7 @@ class InterfazAudio(QMainWindow):
             }
         """
 
-        # 3. BOTONES DE ACCIÓN
+        #Botones de accion
         botonesLayout = QHBoxLayout()
         
         self.btnGrabar = QPushButton(" GRABAR", self)
@@ -129,7 +131,7 @@ class InterfazAudio(QMainWindow):
         
         layout.addLayout(botonesLayout)
         
-        # 4. RECUADROS DE TEXTO (QGroupBox)
+        #Recuadros de texto (QGroupBox)
         textosLayout = QHBoxLayout()
         
         grupoOriginal = QGroupBox("Mensaje original")
@@ -159,19 +161,19 @@ class InterfazAudio(QMainWindow):
         widgetCentral.setLayout(layout)
         self.grabando = False
         
-        # Inicializar todos apagados menos el verde
+        #Inicializar todos apagados menos el verde
         self.actualizarFocos("verde")
 
     def actualizarFocos(self, focoActivo):
-        """Apaga todos los focos y enciende solo el solicitado ('rojo', 'azul', 'verde' o 'ninguno')."""
+        """Apaga todos los focos y enciende solo el solicitado"""
         estiloApagado = "QLabel { background-color: #bbbbbb; border-radius: 8px; }"
         
-        # Apagar todos primero
+        #Apagar todos primero
         self.focoRojo.setStyleSheet(estiloApagado)
         self.focoAzul.setStyleSheet(estiloApagado)
         self.focoVerde.setStyleSheet(estiloApagado)
         
-        # Encender el correspondiente (sin bordes tan toscos, solo color vivo)
+        #Encender el correspondiente
         if focoActivo == "rojo":
             self.focoRojo.setStyleSheet("QLabel { background-color: #ff3333; border-radius: 8px; }")
         elif focoActivo == "azul":
@@ -180,7 +182,7 @@ class InterfazAudio(QMainWindow):
             self.focoVerde.setStyleSheet("QLabel { background-color: #00cc66; border-radius: 8px; }")
 
     def toggleGrabacion(self):
-        """Lógica para grabar y detener el audio con AudioCtrl."""
+        """Maneja el inicio y detencion de la grabacion procesando el audio en cascada"""
         if not self.grabando:
             self.grabando = True
             self.btnGrabar.setText(" DETENER")
@@ -195,6 +197,8 @@ class InterfazAudio(QMainWindow):
             self.axCensurado.set_title("Censurado")
             self.canvas.draw()
             
+            self.t_inicio_grabacion = time.perf_counter()
+            print(f"\n[{time.strftime('%H:%M:%S')}] --- INICIO: Comenzando a grabar audio ---")
             self.audioCtrl.iniciarGrabacion()
         else:
             self.grabando = False
@@ -202,47 +206,74 @@ class InterfazAudio(QMainWindow):
             self.actualizarFocos("azul")
             QApplication.processEvents()
             
+            t_fin_grabacion = time.perf_counter()
+            print(f"[{time.strftime('%H:%M:%S')}] --- Grabación detenida. Duración de la captura: {t_fin_grabacion - self.t_inicio_grabacion:.3f} s ---")
+            
             self.audioCtrl.detenerGrabacion()
             
+            #Tiempo de preprocesamiento
+            t_inicio_pre = time.perf_counter()
             #Normalizamos inmediatamente para precalcular las matrices finales
             self.audioCtrl.normalizarAudio()
+            t_fin_pre = time.perf_counter()
+            print(f"[{time.strftime('%H:%M:%S')}] --- Tiempo de preprocesamiento (Normalización + STFT): {t_fin_pre - t_inicio_pre:.3f} s ---")
             
-            # 1. GRAFICAR INMEDIATAMENTE AL DETENER (con el audio original precalculado)
+            #Tiempo de primera graficacion
+            t_inicio_graf = time.perf_counter()
             self.dibujarGraficos()
             QApplication.processEvents()
+            t_fin_graf = time.perf_counter()
+            print(f"[{time.strftime('%H:%M:%S')}] --- Tiempo de primera graficación: {t_fin_graf - t_inicio_graf:.3f} s ---")
             
-            #Transcribir el audio a texto y obtener las palabras con sus marcas de tiempo
+            #Tiempo de inferencia de Whisper
+            t_inicio_whisper = time.perf_counter()
             textoOriginal, palabrasConTiempo = self.whisperTranscriptor.transcribir(self.audioCtrl.audioData, self.audioCtrl.sampleRate)
+            t_fin_whisper = time.perf_counter()
+            print(f"[{time.strftime('%H:%M:%S')}] --- Tiempo de inferencia de Whisper: {t_fin_whisper - t_inicio_whisper:.3f} s ---")
             
             if textoOriginal:
-                #Texto completo censurado (para la etiqueta)
+                #Tiempo de censura
+                t_inicio_censura = time.perf_counter()
+                
+                #Texto completo censurado para la etiqueta
                 _, textoCensurado = self.censurador.core(textoOriginal)
                 self.labelTranscripcion.setText(textoOriginal)
                 self.labelCensurado.setText(textoCensurado)
                 
-                #Revisar qué palabras exactas se censuran para obtener sus tiempos
-                palabras_a_silenciar = []
+                #Revisar que palabras exactas se censuran para obtener sus tiempos
+                palabrasASilenciar = []
                 for p in palabrasConTiempo:
                     #Evaluamos la palabra aislada
                     _, cens = self.censurador.core(p["word"])
-                    #Si el censurador puso un '*' en la palabra, significa que es mala
+                    #Si el censurador puso un asterisco en la palabra significa que es mala
                     if "*" in cens:
-                        palabras_a_silenciar.append(p)
+                        palabrasASilenciar.append(p)
                 
-                #Aplicamos la censura al arreglo de audio (silenciamos)
-                self.audioCtrl.aplicarCensuraAudio(palabras_a_silenciar)
+                #Aplicamos la censura al arreglo de audio y matriz
+                self.audioCtrl.aplicarCensuraAudio(palabrasASilenciar)
                 
-                # 2. VOLVER A GRAFICAR UNA VEZ CENSURADO
+                t_fin_censura = time.perf_counter()
+                print(f"[{time.strftime('%H:%M:%S')}] --- Tiempo de censura (NLP y modificación matricial): {t_fin_censura - t_inicio_censura:.3f} s ---")
+                
+                #Tiempo de segunda graficacion
+                t_inicio_graf2 = time.perf_counter()
                 self.dibujarGraficos()
+                t_fin_graf2 = time.perf_counter()
+                print(f"[{time.strftime('%H:%M:%S')}] --- Tiempo de segunda graficación: {t_fin_graf2 - t_inicio_graf2:.3f} s ---")
+                
                 self.actualizarFocos("verde")
             else:
                 self.labelTranscripcion.setText("(No se detectó voz)")
                 self.labelCensurado.setText("-")
-                #Ya está graficado el original de todos modos
+                #Ya esta graficado el original de todos modos
                 self.actualizarFocos("verde")
+                
+            #Fin del proceso
+            t_fin_total = time.perf_counter()
+            print(f"[{time.strftime('%H:%M:%S')}] --- FIN: Interfaz lista para interactuar. Tiempo total de espera del usuario: {t_fin_total - t_fin_grabacion:.3f} s ---\n")
 
     def cambiarModoGrafico(self, textoSeleccionado):
-        """Cambia entre la vista de forma de onda y espectrograma según el combobox."""
+        """Cambia entre la vista de forma de onda y espectrograma segun el combobox"""
         if textoSeleccionado == "Forma de Onda":
             self.modoGrafico = "onda"
         else:
@@ -252,11 +283,11 @@ class InterfazAudio(QMainWindow):
         self.dibujarGraficos()
 
     def dibujarGraficos(self):
-        """Delega la tarea de graficar a la lógica de AudioCtrl.py."""
+        """Delega la tarea de graficar a la logica del controlador de audio"""
         self.axOriginal.clear()
         self.axCensurado.clear()
         
-        # Le pedimos al controlador de audio que use librosa para dibujar en nuestros ejes (ax)
+        #Le pedimos al controlador de audio que use librosa para dibujar
         self.audioCtrl.graficarAudio(self.axOriginal, tipo=self.modoGrafico, censurado=False)
         self.audioCtrl.graficarAudio(self.axCensurado, tipo=self.modoGrafico, censurado=True)
             
@@ -264,7 +295,7 @@ class InterfazAudio(QMainWindow):
         self.canvas.draw()
 
     def reproducirOriginal(self):
-        """Reproduce el audio original."""
+        """Reproduce el audio original por los altavoces"""
         if self.grabando:
             return
         self.actualizarFocos("verde")
@@ -273,7 +304,7 @@ class InterfazAudio(QMainWindow):
         self.actualizarFocos("verde")
 
     def reproducirCensurado(self):
-        """Reproduce el audio censurado."""
+        """Reproduce el audio censurado por los altavoces"""
         if self.grabando:
             return
         self.actualizarFocos("verde")

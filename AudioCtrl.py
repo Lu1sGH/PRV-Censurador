@@ -1,13 +1,14 @@
-import sounddevice as sd
-import soundfile as sf
-import numpy as np
-import queue
-import librosa
-import librosa.display
+import sounddevice as sd #Captura de audio del microfono
+import soundfile as sf #Lectura y escritura de archivos de audio
+import numpy as np #Manejo de arreglos matematicos
+import queue #Estructura de datos para audio
+import librosa #Libreria de procesamiento de audio
+import librosa.display #Visualizacion de audio
 
 class AudioCtrl:
     def __init__(self, sampleRate=16000, channels=1):
-        #Utilizamos 16000 Hz debido a que Whisper funciona mejor con esa frecuencia y es suficiente para voz
+        """Inicializa el controlador de audio y establece los arreglos base"""
+        #Utilizamos 16000 Hz debido a que Whisper funciona mejor
         self.sampleRate = sampleRate
         self.channels = channels
         self.q = queue.Queue()
@@ -18,13 +19,13 @@ class AudioCtrl:
         self.audioCensurado = np.array([], dtype='float32')
 
     def callbackGrabacion(self, inData, frames, time, status):
-        """Callback que almacena en la cola los bloques del micrófono."""
+        """Almacena en la cola los bloques de audio recibidos del microfono"""
         if status:
             print(status)
         self.q.put(inData.copy())
 
     def iniciarGrabacion(self):
-        """Inicia el flujo de entrada desde el micrófono."""
+        """Inicia el flujo de entrada desde el microfono"""
         self.audioData = np.array([], dtype='float32') #Reiniciar datos
         self.audioCensurado = np.array([], dtype='float32')
         self.q = queue.Queue()
@@ -35,7 +36,7 @@ class AudioCtrl:
         print("--> Grabación iniciada...")
 
     def detenerGrabacion(self):
-        """Detiene el micrófono y concatena los bloques capturados."""
+        """Detiene el microfono y concatena los bloques capturados"""
         if self.stream is not None:
             self.stream.stop()
             self.stream.close()
@@ -49,59 +50,59 @@ class AudioCtrl:
                 self.audioData = np.concatenate(bloques, axis=0)
                 self.audioCensurado = self.audioData.copy()
                 
-                # Precalcular representaciones costosas (como el espectrograma)
+                #Precalcular representaciones costosas como el espectrograma
                 self.precalcularGraficas()
             
             print("--> Grabación detenida.")
 
     def precalcularGraficas(self):
-        """Calcula el STFT original de una sola vez para no recalcularlo."""
+        """Calcula el stft original de una sola vez para no recalcularlo"""
         if self.audioData is None or len(self.audioData) == 0:
             return
             
         self.n_fft = 2048
         self.hop_length = 512
         
-        # Calculamos STFT original
+        #Calculamos el Stft original
         self.stftOriginal = librosa.stft(self.audioData.flatten(), n_fft=self.n_fft, hop_length=self.hop_length)
-        # La versión censurada iniciará como una copia del original
+        #La version censurada iniciara como una copia del original
         self.stftCensurado = self.stftOriginal.copy()
 
     def normalizarAudio(self):
-        """Normaliza la señal de audio dividiéndola por su amplitud máxima."""
+        """Normaliza la senal de audio dividiendola por su amplitud maxima"""
         if self.audioData is not None and len(self.audioData) > 0:
             amplitudMaxima = np.max(np.abs(self.audioData))
             if amplitudMaxima > 0:
                 self.audioData = self.audioData / amplitudMaxima
                 
-                # Al normalizar la onda, también debemos actualizar los cálculos base
+                #Al normalizar la onda tambien debemos actualizar los calculos base
                 self.audioCensurado = self.audioData.copy()
                 self.precalcularGraficas()
             print("--> Audio normalizado.")
 
     def aplicarCensuraAudio(self, palabrasASilenciar):
-        """Silencia la onda y modifica el espectrograma precalculado."""
+        """Silencia la onda y modifica el espectrograma precalculado segun tiempos"""
         self.audioCensurado = self.audioData.copy()
         self.stftCensurado = self.stftOriginal.copy()
         
         for p in palabrasASilenciar:
-            # 1. Modificar la forma de onda
+            #Modificar la forma de onda
             inicioMuestra = int(p["start"] * self.sampleRate)
             finMuestra = int(p["end"] * self.sampleRate)
             self.audioCensurado[inicioMuestra:finMuestra] = 0
             
-            # 2. Modificar el espectrograma precalculado (STFT)
-            # Cada columna del STFT representa hop_length muestras
+            #Modificar el espectrograma precalculado Stft
+            #Cada columna del Stft representa la cantidad de muestras del salto
             inicioCol = int(inicioMuestra / self.hop_length)
             finCol = int(finMuestra / self.hop_length)
             
-            # Volver las frecuencias de ese bloque casi 0 (1e-10 para evitar errores en log)
+            #Volver las frecuencias de ese bloque casi cero para evitar errores
             self.stftCensurado[:, inicioCol:finCol] = 1e-10
             
         print(f"--> Audio censurado: se silenciaron {len(palabrasASilenciar)} palabra(s).")
 
     def reproducirAudioOriginal(self):
-        """Reproduce la señal original."""
+        """Reproduce la senal original de audio"""
         if self.audioData is not None and len(self.audioData) > 0:
             print("--> Reproduciendo audio original...")
             sd.play(self.audioData, self.sampleRate)
@@ -109,7 +110,7 @@ class AudioCtrl:
             print("--> No hay audio original para reproducir.")
 
     def reproducirAudioCensurado(self):
-        """Reproduce la señal censurada (silenciada)."""
+        """Reproduce la senal de audio censurada silenciada"""
         if self.audioCensurado is not None and len(self.audioCensurado) > 0:
             print("--> Reproduciendo audio censurado...")
             sd.play(self.audioCensurado, self.sampleRate)
@@ -117,7 +118,7 @@ class AudioCtrl:
             print("--> No hay audio censurado para reproducir.")
 
     def graficarAudio(self, ax, tipo="onda", censurado=False):
-        """Usa librosa para graficar usando datos precalculados en los ejes de Matplotlib."""
+        """Usa librosa para graficar usando los datos precalculados en los ejes provistos"""
         if self.audioData is None or len(self.audioData) == 0:
             return
             
@@ -129,9 +130,9 @@ class AudioCtrl:
         elif tipo == "espectrograma":
             stft = self.stftCensurado if censurado else self.stftOriginal
             magnitud = np.abs(stft)
-            espectrograma_db = librosa.amplitude_to_db(magnitud, ref=np.max)
+            espectrogramaDb = librosa.amplitude_to_db(magnitud, ref=np.max)
             
-            librosa.display.specshow(espectrograma_db, 
+            librosa.display.specshow(espectrogramaDb, 
                                      sr=self.sampleRate, 
                                      hop_length=self.hop_length, 
                                      x_axis="time", 

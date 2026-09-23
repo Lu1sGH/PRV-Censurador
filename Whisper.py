@@ -1,16 +1,17 @@
-import whisper
-import numpy as np
-import torch
-import torchaudio
+import whisper #Modelo de voz a texto
+import numpy as np #Manejo de arreglos
+import torch #Tensores para inteligencia artificial
+import torchaudio #Procesamiento de audio para tensores
 
 class WhisperTranscriptor:
     def __init__(self, modeloNombre="small"):
+        """Inicializa el modelo de Whisper y lo carga en memoria"""
         print(f"--> Cargando modelo Whisper '{modeloNombre}' (puede tardar la primera vez)...")
         self.modelo = whisper.load_model(modeloNombre)
         print("--> Modelo Whisper cargado exitosamente.")
 
     def transcribir(self, audioData, sampleRate):
-        """Transcribe audio usando Whisper y devuelve texto y tiempos (ms) de cada palabra."""
+        """Transcribe audio usando Whisper y devuelve texto y tiempos en milisegundos de cada palabra"""
         if audioData is None or len(audioData) == 0:
             return "", []
             
@@ -18,16 +19,16 @@ class WhisperTranscriptor:
         
         audio1D = audioData.flatten().astype(np.float32)
         
-        #Whisper requiere que el audio esté a 16000 Hz.
-        #Hacemos un resample temporal a 16kHz solo para Whisper.
+        #Whisper requiere que el audio este a 16000 Hz
+        #Hacemos un resample temporal a 16kHz solo para Whisper
         if sampleRate != 16000:
-            #Convertimos a tensor de PyTorch (1, muestras)
+            #Convertimos a tensor de PyTorch
             tensorAudio = torch.from_numpy(audio1D).unsqueeze(0)
             resampler = torchaudio.transforms.Resample(orig_freq=sampleRate, new_freq=16000)
             tensorResampleado = resampler(tensorAudio)
             audio1D = tensorResampleado.squeeze(0).numpy()
         
-        #word_timestamps=True es clave para saber en qué milisegundo ocurre la palabra
+        #La bandera word_timestamps es clave para saber en que milisegundo ocurre la palabra
         resultado = self.modelo.transcribe(audio1D, language="es", word_timestamps=True)
         
         textoCompleto = resultado["text"].strip()
