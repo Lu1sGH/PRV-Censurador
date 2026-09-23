@@ -2,9 +2,10 @@ import sounddevice as sd
 import soundfile as sf
 import numpy as np
 import queue
-import whisper
+import librosa
+import librosa.display
 
-class AudioPro:
+class AudioCtrl:
     def __init__(self, sampleRate=16000, channels=1):
         #Utilizamos 16000 Hz debido a que Whisper funciona mejor con esa frecuencia y es suficiente para voz
         self.sampleRate = sampleRate
@@ -15,11 +16,6 @@ class AudioPro:
         #Arreglos para el audio original y el censurado
         self.audioData = np.array([], dtype='float32')
         self.audioCensurado = np.array([], dtype='float32')
-        
-        print("--> Cargando modelo Whisper (puede tardar la primera vez)...")
-        #Cambiamos a 'small' para mucha mayor precisión en español (similar a Google)
-        self.modelo = whisper.load_model("small")
-        print("--> Modelo Whisper cargado.")
 
     def callbackGrabacion(self, inData, frames, time, status):
         """Callback que almacena en la cola los bloques del micrófono."""
@@ -45,17 +41,31 @@ class AudioPro:
             self.stream.close()
             self.stream = None
             
-            #Recopilamos todos los bloques
             bloques = []
             while not self.q.empty():
                 bloques.append(self.q.get())
                 
             if bloques:
                 self.audioData = np.concatenate(bloques, axis=0)
-                #Inicialmente, el censurado es igual al original
                 self.audioCensurado = self.audioData.copy()
+                
+                # Precalcular representaciones costosas (como el espectrograma)
+                self.precalcularGraficas()
             
             print("--> Grabación detenida.")
+
+    def precalcularGraficas(self):
+        """Calcula el STFT original de una sola vez para no recalcularlo."""
+        if self.audioData is None or len(self.audioData) == 0:
+            return
+            
+        self.n_fft = 2048
+        self.hop_length = 512
+        
+        # Calculamos STFT original
+        self.stftOriginal = librosa.stft(self.audioData.flatten(), n_fft=self.n_fft, hop_length=self.hop_length)
+        # La versión censurada iniciará como una copia del original
+        self.stftCensurado = self.stftOriginal.copy()
 
     def normalizarAudio(self):
         """Normaliza la señal de audio dividiéndola por su amplitud máxima."""
@@ -63,48 +73,30 @@ class AudioPro:
             amplitudMaxima = np.max(np.abs(self.audioData))
             if amplitudMaxima > 0:
                 self.audioData = self.audioData / amplitudMaxima
+                
+                # Al normalizar la onda, también debemos actualizar los cálculos base
+                self.audioCensurado = self.audioData.copy()
+                self.precalcularGraficas()
             print("--> Audio normalizado.")
 
-    def transcribirAudio(self):
-        """Transcribe usando Whisper para obtener texto y tiempos (ms) de cada palabra."""
-        if self.audioData is None or len(self.audioData) == 0:
-            return "", []
-            
-        print("--> Transcribiendo y obteniendo tiempos con Whisper...")
-        
-        #Se normalizar el audio para que el volumen bajo no afecte a Whisper
-        self.normalizarAudio()
-        
-        audio1D = self.audioData.flatten().astype(np.float32)
-        
-        #word_timestamps=True es clave para saber en qué milisegundo ocurre la palabra
-        resultado = self.modelo.transcribe(audio1D, language="es", word_timestamps=True)
-        
-        textoCompleto = resultado["text"].strip()
-        palabrasConTiempo = []
-        
-        #Extraemos cada palabra con su inicio y fin en segundos
-        for segmento in resultado.get("segments", []):
-            for palabra_info in segmento.get("words", []):
-                palabrasConTiempo.append({
-                    "word": palabra_info["word"].strip(),
-                    "start": palabra_info["start"],
-                    "end": palabra_info["end"]
-                })
-                
-        return textoCompleto, palabrasConTiempo
-
     def aplicarCensuraAudio(self, palabrasASilenciar):
-        """Silencia (0) los intervalos de audio correspondientes a las palabras censuradas."""
+        """Silencia la onda y modifica el espectrograma precalculado."""
         self.audioCensurado = self.audioData.copy()
+        self.stftCensurado = self.stftOriginal.copy()
         
         for p in palabrasASilenciar:
-            #Convertimos el tiempo (segundos) a índice de muestra (multiplicando por sampleRate)
+            # 1. Modificar la forma de onda
             inicioMuestra = int(p["start"] * self.sampleRate)
             finMuestra = int(p["end"] * self.sampleRate)
-            
-            #Volvemos 0 (silencio) ese fragmento del arreglo
             self.audioCensurado[inicioMuestra:finMuestra] = 0
+            
+            # 2. Modificar el espectrograma precalculado (STFT)
+            # Cada columna del STFT representa hop_length muestras
+            inicioCol = int(inicioMuestra / self.hop_length)
+            finCol = int(finMuestra / self.hop_length)
+            
+            # Volver las frecuencias de ese bloque casi 0 (1e-10 para evitar errores en log)
+            self.stftCensurado[:, inicioCol:finCol] = 1e-10
             
         print(f"--> Audio censurado: se silenciaron {len(palabrasASilenciar)} palabra(s).")
 
@@ -123,3 +115,31 @@ class AudioPro:
             sd.play(self.audioCensurado, self.sampleRate)
         else:
             print("--> No hay audio censurado para reproducir.")
+
+    def graficarAudio(self, ax, tipo="onda", censurado=False):
+        """Usa librosa para graficar usando datos precalculados en los ejes de Matplotlib."""
+        if self.audioData is None or len(self.audioData) == 0:
+            return
+            
+        if tipo == "onda":
+            audio = self.audioCensurado if censurado else self.audioData
+            librosa.display.waveshow(audio.flatten(), sr=self.sampleRate, ax=ax, color='red' if censurado else 'blue')
+            ax.set_ylabel("Amplitud")
+            
+        elif tipo == "espectrograma":
+            stft = self.stftCensurado if censurado else self.stftOriginal
+            magnitud = np.abs(stft)
+            espectrograma_db = librosa.amplitude_to_db(magnitud, ref=np.max)
+            
+            librosa.display.specshow(espectrograma_db, 
+                                     sr=self.sampleRate, 
+                                     hop_length=self.hop_length, 
+                                     x_axis="time", 
+                                     y_axis="log", 
+                                     ax=ax, 
+                                     cmap='inferno' if censurado else 'viridis')
+            ax.set_ylabel("Frec. (Hz)")
+            
+        titulo = "Censurado" if censurado else "Original"
+        ax.set_title(f"Forma de onda {titulo}" if tipo == "onda" else f"Espectrograma {titulo}")
+        ax.set_xlabel("Tiempo (s)")

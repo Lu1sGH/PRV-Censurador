@@ -1,3 +1,4 @@
 .venv/
 codigo_2_rvoz.py
 Codigo_1_RVoz.ipynb
+__pycache__/
