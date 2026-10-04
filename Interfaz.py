@@ -72,6 +72,12 @@ class InterfazAudio(QMainWindow):
         self.comboGrafico.currentTextChanged.connect(self.cambiarModoGrafico)
         headerLayout.addWidget(self.comboGrafico)
         
+        self.comboModelo = QComboBox(self)
+        self.comboModelo.addItems(["Modelo Whisper: small", "Modelo Whisper: base", "Modelo Whisper: tiny"])
+        self.comboModelo.setFont(QFont("Arial", 10))
+        self.comboModelo.currentTextChanged.connect(self.cambiarModeloWhisper)
+        headerLayout.addWidget(self.comboModelo)
+        
         layout.addLayout(headerLayout)
 
         #Graficos Matplotlib
@@ -271,6 +277,23 @@ class InterfazAudio(QMainWindow):
             #Fin del proceso
             t_fin_total = time.perf_counter()
             print(f"[{time.strftime('%H:%M:%S')}] --- FIN. Tiempo total de espera del usuario: {t_fin_total - t_fin_grabacion:.3f} s ---\n")
+
+    def cambiarModeloWhisper(self, textoSeleccionado):
+        """Cambia el modelo de Whisper y lo recarga en memoria"""
+        nombre = textoSeleccionado.replace("Modelo Whisper: ", "").strip()
+        print(f"\n--> Cambiando modelo de Whisper a '{nombre}'...")
+        
+        #Indicador visual de procesamiento
+        self.btnGrabar.setEnabled(False)
+        self.actualizarFocos("rojo")
+        QApplication.processEvents()
+        
+        #Cargamos el nuevo modelo
+        self.whisperTranscriptor = WhisperTranscriptor(nombre)
+        
+        #Restauramos la interfaz
+        self.btnGrabar.setEnabled(True)
+        self.actualizarFocos("verde")
 
     def cambiarModoGrafico(self, textoSeleccionado):
         """Cambia entre la vista de forma de onda y espectrograma segun el combobox"""

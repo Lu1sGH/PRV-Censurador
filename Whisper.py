@@ -6,8 +6,11 @@ import torchaudio #Procesamiento de audio para tensores
 class WhisperTranscriptor:
     def __init__(self, modeloNombre="small"):
         """Inicializa el modelo de Whisper y lo carga en memoria"""
+        #Detectar si hay GPU disponible
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        print(f"--> Usando dispositivo: {self.device.upper()}")
         print(f"--> Cargando modelo Whisper '{modeloNombre}' (puede tardar la primera vez)...")
-        self.modelo = whisper.load_model(modeloNombre)
+        self.modelo = whisper.load_model(modeloNombre, device=self.device)
         print("--> Modelo Whisper cargado exitosamente.")
 
     def transcribir(self, audioData, sampleRate):
