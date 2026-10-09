@@ -1,9 +1,9 @@
 import sys #Manejo del sistema
 import time #Medicion de tiempos
 import numpy as np #Manejo de arreglos matematicos
-from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QComboBox, QGroupBox, QSpacerItem, QSizePolicy, QGridLayout #Elementos graficos principales
-from PyQt5.QtGui import QIcon, QFont #Iconos y fuentes
-from PyQt5.QtCore import Qt, QSize #Constantes Qt
+from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QComboBox, QGroupBox, QSpacerItem, QSizePolicy, QGridLayout, QStackedWidget
+from PyQt5.QtGui import QIcon, QFont, QImage, QPixmap
+from PyQt5.QtCore import Qt, QSize, QTimer
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas #Lienzo para graficas
 from matplotlib.figure import Figure #Figura grafica
 from AudioCtrl import AudioCtrl #Controlador de audio
@@ -68,6 +68,7 @@ class InterfazAudio(QMainWindow):
         self.comboGrafico = QComboBox(self)
         self.comboGrafico.addItem("Forma de Onda")
         self.comboGrafico.addItem("Espectrograma")
+        self.comboGrafico.addItem("Video")
         self.comboGrafico.setFont(QFont("Arial", 10))
         self.comboGrafico.currentTextChanged.connect(self.cambiarModoGrafico)
         headerLayout.addWidget(self.comboGrafico)
@@ -80,7 +81,10 @@ class InterfazAudio(QMainWindow):
         
         layout.addLayout(headerLayout)
 
-        #Graficos Matplotlib
+        #Panel intercambiable (Graficos o Video)
+        self.stackedWidget = QStackedWidget()
+        
+        #Pagina 0: Graficos Matplotlib
         self.figura = Figure(figsize=(6, 4))
         self.canvas = FigureCanvas(self.figura)
         self.axOriginal = self.figura.add_subplot(211)
@@ -88,7 +92,20 @@ class InterfazAudio(QMainWindow):
         self.axCensurado = self.figura.add_subplot(212)
         self.axCensurado.set_title("Censurado")
         self.figura.tight_layout()
-        layout.addWidget(self.canvas)
+        self.stackedWidget.addWidget(self.canvas)
+        
+        #Pagina 1: Video
+        self.labelVideo = QLabel("Captura de Video")
+        self.labelVideo.setAlignment(Qt.AlignCenter)
+        self.labelVideo.setStyleSheet("QLabel { background-color: #000; color: #fff; font-size: 16px; }")
+        self.stackedWidget.addWidget(self.labelVideo)
+        
+        layout.addWidget(self.stackedWidget)
+        
+        #Configuracion del temporizador de reproduccion de video
+        self.timerVideo = QTimer()
+        self.timerVideo.timeout.connect(self.actualizarFrameVideo)
+        self.frameActual = 0
 
         self.modoGrafico = "onda"
 
@@ -197,11 +214,15 @@ class InterfazAudio(QMainWindow):
             self.labelTranscripcion.setText("...")
             self.labelCensurado.setText("...")
             
+            #Limpiar graficos y video
             self.axOriginal.clear()
             self.axOriginal.set_title("Original")
             self.axCensurado.clear()
             self.axCensurado.set_title("Censurado")
             self.canvas.draw()
+            self.labelVideo.clear()
+            self.labelVideo.setText("Capturando video...")
+            self.timerVideo.stop()
             
             self.t_inicio_grabacion = time.perf_counter()
             print(f"\n[{time.strftime('%H:%M:%S')}] --- INICIO ---")
@@ -296,14 +317,24 @@ class InterfazAudio(QMainWindow):
         self.actualizarFocos("verde")
 
     def cambiarModoGrafico(self, textoSeleccionado):
-        """Cambia entre la vista de forma de onda y espectrograma segun el combobox"""
+        """Cambia entre la vista de forma de onda, espectrograma o video"""
         if textoSeleccionado == "Forma de Onda":
             self.modoGrafico = "onda"
-        else:
+            self.stackedWidget.setCurrentIndex(0)
+            self.dibujarGraficos()
+        elif textoSeleccionado == "Espectrograma":
             self.modoGrafico = "espectrograma"
-        
-        #Redibujar si hay datos
-        self.dibujarGraficos()
+            self.stackedWidget.setCurrentIndex(0)
+            self.dibujarGraficos()
+        elif textoSeleccionado == "Video":
+            self.modoGrafico = "video"
+            self.stackedWidget.setCurrentIndex(1)
+            # Mostramos el primer frame estatico si hay video disponible
+            if len(self.audioCtrl.videoFrames) > 0:
+                self.mostrarFrame(0)
+            else:
+                self.labelVideo.clear()
+                self.labelVideo.setText("No hay video capturado")
 
     def dibujarGraficos(self):
         """Delega la tarea de graficar a la logica del controlador de audio"""
@@ -318,22 +349,63 @@ class InterfazAudio(QMainWindow):
         self.canvas.draw()
 
     def reproducirOriginal(self):
-        """Reproduce el audio original por los altavoces"""
+        """Reproduce el audio original y el video si hay capturas"""
         if self.grabando:
             return
         self.actualizarFocos("verde")
         QApplication.processEvents()
+        
         self.audioCtrl.reproducirAudioOriginal()
-        self.actualizarFocos("verde")
+        
+        #Iniciamos la reproduccion del video
+        if len(self.audioCtrl.videoFrames) > 0 and self.modoGrafico == "video":
+            self.iniciarReproduccionVideo()
 
     def reproducirCensurado(self):
-        """Reproduce el audio censurado por los altavoces"""
+        """Reproduce el audio censurado y el video si hay capturas"""
         if self.grabando:
             return
         self.actualizarFocos("verde")
         QApplication.processEvents()
+        
         self.audioCtrl.reproducirAudioCensurado()
-        self.actualizarFocos("verde")
+        
+        #Iniciamos la reproduccion del video
+        if len(self.audioCtrl.videoFrames) > 0 and self.modoGrafico == "video":
+            self.iniciarReproduccionVideo()
+
+    def iniciarReproduccionVideo(self):
+        """Prepara el temporizador y comienza a reproducir los cuadros de video basándose en el tiempo real"""
+        self.timerVideo.stop()
+        self.inicioReproduccion = time.perf_counter()
+        self.frameAnteriorMostrado = -1
+        
+        if self.audioCtrl.fpsVideo > 0:
+            # Refrescar muy rapido (ej. cada 15 ms) y buscar el cuadro exacto que corresponde
+            self.timerVideo.start(15)
+            
+    def actualizarFrameVideo(self):
+        """Calcula el cuadro exacto según el tiempo transcurrido para forzar sincronía total"""
+        tiempoTranscurrido = time.perf_counter() - self.inicioReproduccion
+        indiceEsperado = int(tiempoTranscurrido * self.audioCtrl.fpsVideo)
+        
+        if indiceEsperado < len(self.audioCtrl.videoFrames):
+            # Solo actualizar si cambio el indice para no desperdiciar recursos dibujando el mismo cuadro
+            if self.frameAnteriorMostrado != indiceEsperado:
+                self.mostrarFrame(indiceEsperado)
+                self.frameAnteriorMostrado = indiceEsperado
+        else:
+            self.timerVideo.stop()
+            
+    def mostrarFrame(self, indice):
+        """Convierte y dibuja un cuadro de OpenCV en el QLabel de la interfaz"""
+        frame = self.audioCtrl.videoFrames[indice]
+        h, w, ch = frame.shape
+        bytesPerLine = ch * w
+        qImg = QImage(frame.data, w, h, bytesPerLine, QImage.Format_RGB888)
+        pixmap = QPixmap.fromImage(qImg)
+        pixmap = pixmap.scaled(self.labelVideo.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        self.labelVideo.setPixmap(pixmap)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

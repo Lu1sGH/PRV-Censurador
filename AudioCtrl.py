@@ -4,6 +4,9 @@ import numpy as np #Manejo de arreglos matematicos
 import queue #Estructura de datos para audio
 import librosa #Libreria de procesamiento de audio
 import librosa.display #Visualizacion de audio
+import cv2 #Captura de video
+import threading #Hilos para grabar video y audio simultaneamente
+import time #Control de tiempo en video
 
 class AudioCtrl:
     def __init__(self, sampleRate=16000, channels=1):
@@ -17,26 +20,72 @@ class AudioCtrl:
         #Arreglos para el audio original y el censurado
         self.audioData = np.array([], dtype='float32')
         self.audioCensurado = np.array([], dtype='float32')
+        
+        #Variables para video
+        self.videoFrames = []
+        self.videoCaptura = None
+        self.grabandoVideo = False
+        self.threadVideo = None
+        self.fpsVideo = 30.0
 
-    def callbackGrabacion(self, inData, frames, time, status):
+    def callbackGrabacion(self, inData, frames, time_info, status):
         """Almacena en la cola los bloques de audio recibidos del microfono"""
         if status:
             print(status)
         self.q.put(inData.copy())
 
     def iniciarGrabacion(self):
-        """Inicia el flujo de entrada desde el microfono"""
+        """Inicia el flujo de entrada desde el microfono y la camara web"""
         self.audioData = np.array([], dtype='float32') #Reiniciar datos
         self.audioCensurado = np.array([], dtype='float32')
         self.q = queue.Queue()
+        
+        # Iniciar video
+        self.videoFrames = []
+        self.videoCaptura = cv2.VideoCapture(0)
+        fps = self.videoCaptura.get(cv2.CAP_PROP_FPS)
+        self.fpsVideo = fps if fps > 0 else 30.0
+        self.grabandoVideo = True
+        self.threadVideo = threading.Thread(target=self.loopVideo)
+        self.threadVideo.start()
+        
+        # Iniciar audio
         self.stream = sd.InputStream(samplerate=self.sampleRate, 
                                      channels=self.channels,
                                      callback=self.callbackGrabacion)
         self.stream.start()
-        print("--> Grabación iniciada...")
+        self.tiempoInicioGrabacion = time.perf_counter()
+        print("--> Grabación de audio y video iniciada...")
+
+    def loopVideo(self):
+        """Bucle en un hilo separado para capturar cuadros de video"""
+        while self.grabandoVideo and self.videoCaptura.isOpened():
+            ret, frame = self.videoCaptura.read()
+            if ret:
+                # Convertimos el frame de BGR a RGB para la interfaz Qt
+                frameRgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                self.videoFrames.append(frameRgb)
+            # Pequeña pausa para no saturar el hilo, si la camara ya limita fps no es estrictamente necesario
+            time.sleep(0.001)
 
     def detenerGrabacion(self):
-        """Detiene el microfono y concatena los bloques capturados"""
+        """Detiene el microfono, la camara y concatena los bloques capturados"""
+        self.tiempoFinGrabacion = time.perf_counter()
+        
+        # Detener video
+        self.grabandoVideo = False
+        if self.threadVideo is not None:
+            self.threadVideo.join()
+        if self.videoCaptura is not None:
+            self.videoCaptura.release()
+            self.videoCaptura = None
+            
+        # Calcular los FPS reales en base al tiempo transcurrido
+        duracionReal = self.tiempoFinGrabacion - self.tiempoInicioGrabacion
+        if duracionReal > 0 and len(self.videoFrames) > 0:
+            self.fpsVideo = len(self.videoFrames) / duracionReal
+            
+        # Detener audio
         if self.stream is not None:
             self.stream.stop()
             self.stream.close()
@@ -53,7 +102,7 @@ class AudioCtrl:
                 #Precalcular representaciones costosas como el espectrograma
                 self.precalcularGraficas()
             
-            print("--> Grabación detenida.")
+            print(f"--> Grabación detenida. Total de frames de video: {len(self.videoFrames)}")
 
     def precalcularGraficas(self):
         """Calcula el stft original de una sola vez para no recalcularlo"""

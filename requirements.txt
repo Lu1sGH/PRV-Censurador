@@ -42,3 +42,4 @@ tqdm==4.70.1
 typing_extensions==4.16.0
 urllib3==2.8.0
 --extra-index-url https://download.pytorch.org/whl/cu118
+opencv-python==5.0.0.93
