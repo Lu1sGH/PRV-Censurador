@@ -4,6 +4,11 @@ from PyQt5.QtWidgets import QApplication #Aplicacion grafica
 from Interfaz import InterfazAudio #Ventana principal
 
 if __name__ == "__main__":
+    #Habilitar aceleracion de tensores en tarjetas graficas compatibles
+    if torch.cuda.is_available():
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
+
     #Iniciar la aplicacion de PyQt
     app = QApplication(sys.argv)
     ventana = InterfazAudio()
