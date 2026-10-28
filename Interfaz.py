@@ -1,14 +1,19 @@
-import sys #Manejo del sistema
-import time #Medicion de tiempos
-import numpy as np #Manejo de arreglos matematicos
-from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QComboBox, QGroupBox, QSpacerItem, QSizePolicy, QGridLayout, QStackedWidget
-from PyQt5.QtGui import QIcon, QFont, QImage, QPixmap
-from PyQt5.QtCore import Qt, QSize, QTimer
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas #Lienzo para graficas
-from matplotlib.figure import Figure #Figura grafica
-from AudioCtrl import AudioCtrl #Controlador de audio
-from Censurador import Censurador #Procesador de texto
-from Whisper import WhisperTranscriptor #Transcriptor de voz
+import sys  # Manejo del sistema
+import time  # Medicion de tiempos
+import numpy as np  # Manejo de arreglos matematicos
+from PyQt5.QtWidgets import (
+    QApplication, QMainWindow, QPushButton, QVBoxLayout, QHBoxLayout,
+    QWidget, QLabel, QComboBox, QGroupBox, QSpacerItem, QSizePolicy,
+    QGridLayout, QStackedWidget
+)  #
+from PyQt5.QtGui import QIcon, QFont, QImage, QPixmap  
+from PyQt5.QtCore import Qt, QSize, QTimer  
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas  # Lienzo para graficas
+from matplotlib.figure import Figure  # Figura grafica
+from AudioCtrl import AudioCtrl  # Controlador de audio
+from Censurador import Censurador  # Procesador de texto
+from Whisper import WhisperTranscriptor  # Transcriptor de voz
+
 
 class InterfazAudio(QMainWindow):
     def __init__(self):
@@ -17,8 +22,8 @@ class InterfazAudio(QMainWindow):
         self.audioCtrl = AudioCtrl()
         self.censurador = Censurador('MX')
         self.whisperTranscriptor = WhisperTranscriptor('small')
-        
-        self.setWindowTitle("Aplicación de Audio - Censurador")
+
+        self.setWindowTitle("Aplicación de Audio - Censurador Léxico y D.D.O. Binario")
         self.setGeometry(100, 100, 750, 750)
         self.setStyleSheet("QMainWindow { background-color: #f5f5f5; }")
 
@@ -27,14 +32,14 @@ class InterfazAudio(QMainWindow):
         layout.setContentsMargins(15, 15, 15, 15)
         self.setCentralWidget(widgetCentral)
 
-        #Focos indicadores rojo azul verde
+        # Focos indicadores rojo azul verde
         headerLayout = QHBoxLayout()
         headerLayout.setAlignment(Qt.AlignLeft)
-        
+
         focosGrid = QGridLayout()
         focosGrid.setSpacing(10)
-        
-        #Foco rojo
+
+        # Foco rojo
         self.focoRojo = QLabel()
         self.focoRojo.setFixedSize(16, 16)
         labelRojo = QLabel("Grabando")
@@ -42,8 +47,8 @@ class InterfazAudio(QMainWindow):
         labelRojo.setAlignment(Qt.AlignCenter)
         focosGrid.addWidget(self.focoRojo, 0, 0, alignment=Qt.AlignCenter)
         focosGrid.addWidget(labelRojo, 1, 0, alignment=Qt.AlignTop | Qt.AlignHCenter)
-        
-        #Foco azul
+
+        # Foco azul
         self.focoAzul = QLabel()
         self.focoAzul.setFixedSize(16, 16)
         labelAzul = QLabel("Procesando\ny censurando")
@@ -51,8 +56,8 @@ class InterfazAudio(QMainWindow):
         labelAzul.setFont(QFont("Arial", 9))
         focosGrid.addWidget(self.focoAzul, 0, 1, alignment=Qt.AlignCenter)
         focosGrid.addWidget(labelAzul, 1, 1, alignment=Qt.AlignTop | Qt.AlignHCenter)
-        
-        #Foco verde
+
+        # Foco verde
         self.focoVerde = QLabel()
         self.focoVerde.setFixedSize(16, 16)
         labelVerde = QLabel("Listo")
@@ -60,11 +65,10 @@ class InterfazAudio(QMainWindow):
         labelVerde.setFont(QFont("Arial", 9))
         focosGrid.addWidget(self.focoVerde, 0, 2, alignment=Qt.AlignCenter)
         focosGrid.addWidget(labelVerde, 1, 2, alignment=Qt.AlignTop | Qt.AlignHCenter)
-        
+
         headerLayout.addLayout(focosGrid)
-        
         headerLayout.addItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
-        
+
         self.comboGrafico = QComboBox(self)
         self.comboGrafico.addItem("Forma de Onda")
         self.comboGrafico.addItem("Espectrograma")
@@ -72,19 +76,19 @@ class InterfazAudio(QMainWindow):
         self.comboGrafico.setFont(QFont("Arial", 10))
         self.comboGrafico.currentTextChanged.connect(self.cambiarModoGrafico)
         headerLayout.addWidget(self.comboGrafico)
-        
+
         self.comboModelo = QComboBox(self)
         self.comboModelo.addItems(["Modelo Whisper: small", "Modelo Whisper: base", "Modelo Whisper: tiny"])
         self.comboModelo.setFont(QFont("Arial", 10))
         self.comboModelo.currentTextChanged.connect(self.cambiarModeloWhisper)
         headerLayout.addWidget(self.comboModelo)
-        
+
         layout.addLayout(headerLayout)
 
-        #Panel intercambiable (Graficos o Video)
+        # Panel intercambiable (Graficos o Video)
         self.stackedWidget = QStackedWidget()
-        
-        #Pagina 0: Graficos Matplotlib
+
+        # Pagina 0: Graficos Matplotlib
         self.figura = Figure(figsize=(6, 4))
         self.canvas = FigureCanvas(self.figura)
         self.axOriginal = self.figura.add_subplot(211)
@@ -93,23 +97,23 @@ class InterfazAudio(QMainWindow):
         self.axCensurado.set_title("Censurado")
         self.figura.tight_layout()
         self.stackedWidget.addWidget(self.canvas)
-        
-        #Pagina 1: Video
+
+        # Pagina 1: Video
         self.labelVideo = QLabel("Captura de Video")
         self.labelVideo.setAlignment(Qt.AlignCenter)
         self.labelVideo.setStyleSheet("QLabel { background-color: #000; color: #fff; font-size: 16px; }")
         self.stackedWidget.addWidget(self.labelVideo)
-        
+
         layout.addWidget(self.stackedWidget)
-        
-        #Configuracion del temporizador de reproduccion de video
+
+        # Configuracion del temporizador de reproduccion de video
         self.timerVideo = QTimer()
         self.timerVideo.timeout.connect(self.actualizarFrameVideo)
         self.frameActual = 0
 
         self.modoGrafico = "onda"
 
-        #Estilo analogico metalico para botones
+        # Estilo analogico metalico para botones
         estiloBotonAnalogico = """
             QPushButton {
                 background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #f0f0f0, stop: 1 #a0a0a0);
@@ -128,9 +132,9 @@ class InterfazAudio(QMainWindow):
             }
         """
 
-        #Botones de accion
+        # Botones de accion
         botonesLayout = QHBoxLayout()
-        
+
         self.btnGrabar = QPushButton(" GRABAR", self)
         self.btnGrabar.setIcon(QIcon('iconos/mic.svg'))
         self.btnGrabar.setIconSize(QSize(20, 20))
@@ -144,19 +148,19 @@ class InterfazAudio(QMainWindow):
         self.btnReproducirOrig.setStyleSheet(estiloBotonAnalogico)
         self.btnReproducirOrig.clicked.connect(self.reproducirOriginal)
         botonesLayout.addWidget(self.btnReproducirOrig)
-        
+
         self.btnReproducirCens = QPushButton(" REPRODUCIR (CENSURADO)", self)
         self.btnReproducirCens.setIcon(QIcon('iconos/play_censor.svg'))
         self.btnReproducirCens.setIconSize(QSize(20, 20))
         self.btnReproducirCens.setStyleSheet(estiloBotonAnalogico)
         self.btnReproducirCens.clicked.connect(self.reproducirCensurado)
         botonesLayout.addWidget(self.btnReproducirCens)
-        
+
         layout.addLayout(botonesLayout)
-        
-        #Recuadros de texto (QGroupBox)
+
+        # Recuadros de texto (QGroupBox)
         textosLayout = QHBoxLayout()
-        
+
         grupoOriginal = QGroupBox("Mensaje original")
         grupoOriginal.setFont(QFont("Arial", 10))
         layoutOrig = QVBoxLayout()
@@ -167,7 +171,7 @@ class InterfazAudio(QMainWindow):
         layoutOrig.addWidget(self.labelTranscripcion)
         grupoOriginal.setLayout(layoutOrig)
         textosLayout.addWidget(grupoOriginal)
-        
+
         grupoCensurado = QGroupBox("Mensaje censurado")
         grupoCensurado.setFont(QFont("Arial", 10))
         layoutCens = QVBoxLayout()
@@ -183,20 +187,20 @@ class InterfazAudio(QMainWindow):
 
         widgetCentral.setLayout(layout)
         self.grabando = False
-        
-        #Inicializar todos apagados menos el verde
+
+        # Inicializar todos apagados menos el verde
         self.actualizarFocos("verde")
 
     def actualizarFocos(self, focoActivo):
         """Apaga todos los focos y enciende solo el solicitado"""
         estiloApagado = "QLabel { background-color: #bbbbbb; border-radius: 8px; }"
-        
-        #Apagar todos primero
+
+        # Apagar todos primero
         self.focoRojo.setStyleSheet(estiloApagado)
         self.focoAzul.setStyleSheet(estiloApagado)
         self.focoVerde.setStyleSheet(estiloApagado)
-        
-        #Encender el correspondiente
+
+        # Encender el correspondiente   
         if focoActivo == "rojo":
             self.focoRojo.setStyleSheet("QLabel { background-color: #ff3333; border-radius: 8px; }")
         elif focoActivo == "azul":
@@ -210,11 +214,11 @@ class InterfazAudio(QMainWindow):
             self.grabando = True
             self.btnGrabar.setText(" DETENER")
             self.actualizarFocos("rojo")
-            
+
             self.labelTranscripcion.setText("...")
             self.labelCensurado.setText("...")
-            
-            #Limpiar graficos y video
+
+            # Limpiar graficos y video
             self.axOriginal.clear()
             self.axOriginal.set_title("Original")
             self.axCensurado.clear()
@@ -223,7 +227,7 @@ class InterfazAudio(QMainWindow):
             self.labelVideo.clear()
             self.labelVideo.setText("Capturando video...")
             self.timerVideo.stop()
-            
+
             self.t_inicio_grabacion = time.perf_counter()
             print(f"\n[{time.strftime('%H:%M:%S')}] --- INICIO ---")
             self.audioCtrl.iniciarGrabacion()
@@ -232,70 +236,71 @@ class InterfazAudio(QMainWindow):
             self.btnGrabar.setText(" GRABAR")
             self.actualizarFocos("azul")
             QApplication.processEvents()
-            
+
             t_fin_grabacion = time.perf_counter()
             print(f"[{time.strftime('%H:%M:%S')}] --- Grabación detenida. Duración de la captura: {t_fin_grabacion - self.t_inicio_grabacion:.3f} s ---")
-            
+
             self.audioCtrl.detenerGrabacion()
-            
-            #Tiempo de preprocesamiento
+
+            # Tiempo de preprocesamiento
             t_inicio_pre = time.perf_counter()
-            #Normalizamos inmediatamente para precalcular las matrices finales
+            # Normalizamos inmediatamente para precalcular las matrices finales
             self.audioCtrl.normalizarAudio()
             t_fin_pre = time.perf_counter()
             print(f"[{time.strftime('%H:%M:%S')}] --- Tiempo de preprocesamiento del audio: {t_fin_pre - t_inicio_pre:.3f} s ---")
-            
-            #Tiempo de primera graficacion
+
+            # Tiempo de primera graficacion 
             t_inicio_graf = time.perf_counter()
             self.dibujarGraficos()
             QApplication.processEvents()
             t_fin_graf = time.perf_counter()
             print(f"[{time.strftime('%H:%M:%S')}] --- Tiempo de primera graficación: {t_fin_graf - t_inicio_graf:.3f} s ---")
-            
-            #Tiempo de inferencia de Whisper
+
+            # Tiempo de inferencia de Whisper
             t_inicio_whisper = time.perf_counter()
-            textoOriginal, palabrasConTiempo = self.whisperTranscriptor.transcribir(self.audioCtrl.audioData, self.audioCtrl.sampleRate)
+            textoOriginal, palabrasConTiempo = self.whisperTranscriptor.transcribir(
+                self.audioCtrl.audioData,
+                self.audioCtrl.sampleRate
+            )
             t_fin_whisper = time.perf_counter()
             print(f"[{time.strftime('%H:%M:%S')}] --- Tiempo de inferencia de Whisper: {t_fin_whisper - t_inicio_whisper:.3f} s ---")
-            
+
             if textoOriginal:
-                #Tiempo de censura
+                # Tiempo de censura
                 t_inicio_censura = time.perf_counter()
-                
-                #Texto completo censurado para la etiqueta
-                _, textoCensurado = self.censurador.core(textoOriginal)
+
+                # Extraer modulador acustico gamma(w_i) desde forma de onda y espectrograma
+                palabrasConTiempo = self.audioCtrl.calcularModuladorAcustico(palabrasConTiempo)
+
+                # Evaluar Nivel 1 (Levenshtein) y Nivel 2 (Clasificacion Binaria FoE Multimodal)
+                textoCensurado, palabrasASilenciar = self.censurador.evaluar_multimodal_foe(
+                    textoOriginal,
+                    palabrasConTiempo
+                )
+
                 self.labelTranscripcion.setText(textoOriginal)
                 self.labelCensurado.setText(textoCensurado)
-                
-                #Revisar que palabras exactas se censuran para obtener sus tiempos
-                palabrasASilenciar = []
-                for p in palabrasConTiempo:
-                    #Evaluamos la palabra aislada
-                    _, cens = self.censurador.core(p["word"])
-                    #Si el censurador puso un asterisco en la palabra significa que es mala
-                    if "*" in cens:
-                        palabrasASilenciar.append(p)
-                
-                #Aplicamos la censura al arreglo de audio y matriz
+
+                # Aplicamos la censura al arreglo de audio y matriz
                 self.audioCtrl.aplicarCensuraAudio(palabrasASilenciar)
-                
+
                 t_fin_censura = time.perf_counter()
-                print(f"[{time.strftime('%H:%M:%S')}] --- Tiempo de censura (NLP y modificación del audio): {t_fin_censura - t_inicio_censura:.3f} s ---")
-                
-                #Tiempo de segunda graficacion
+                print(f"[{time.strftime('%H:%M:%S')}] --- Tiempo de censura (NLP Binario FoE y modificación del audio): {t_fin_censura - t_inicio_censura:.3f} s ---")
+
+                # Tiempo de segunda graficacion
                 t_inicio_graf2 = time.perf_counter()
                 self.dibujarGraficos()
                 t_fin_graf2 = time.perf_counter()
                 print(f"[{time.strftime('%H:%M:%S')}] --- Tiempo de segunda graficación: {t_fin_graf2 - t_inicio_graf2:.3f} s ---")
-                
+
                 self.actualizarFocos("verde")
             else:
                 self.labelTranscripcion.setText("(No se detectó voz)")
                 self.labelCensurado.setText("-")
-                #Ya esta graficado el original de todos modos
+                # Ya esta graficado el original de todos modos
                 self.actualizarFocos("verde")
-                
-            #Fin del proceso
+
+            # Fin del proceso
             t_fin_total = time.perf_counter()
             print(f"[{time.strftime('%H:%M:%S')}] --- FIN. Tiempo total de espera del usuario: {t_fin_total - t_fin_grabacion:.3f} s ---\n")
 
@@ -303,16 +308,16 @@ class InterfazAudio(QMainWindow):
         """Cambia el modelo de Whisper y lo recarga en memoria"""
         nombre = textoSeleccionado.replace("Modelo Whisper: ", "").strip()
         print(f"\n--> Cambiando modelo de Whisper a '{nombre}'...")
-        
-        #Indicador visual de procesamiento
+
+        # Indicador visual de procesamiento
         self.btnGrabar.setEnabled(False)
         self.actualizarFocos("rojo")
         QApplication.processEvents()
-        
-        #Cargamos el nuevo modelo
+
+        # Cargamos el nuevo modelo  
         self.whisperTranscriptor = WhisperTranscriptor(nombre)
-        
-        #Restauramos la interfaz
+
+        # Restauramos la interfaz
         self.btnGrabar.setEnabled(True)
         self.actualizarFocos("verde")
 
@@ -329,7 +334,7 @@ class InterfazAudio(QMainWindow):
         elif textoSeleccionado == "Video":
             self.modoGrafico = "video"
             self.stackedWidget.setCurrentIndex(1)
-            # Mostramos el primer frame estatico si hay video disponible
+            # Mostramos el primer frame estatico si hay video disponible    
             if len(self.audioCtrl.videoFrames) > 0:
                 self.mostrarFrame(0)
             else:
@@ -340,11 +345,11 @@ class InterfazAudio(QMainWindow):
         """Delega la tarea de graficar a la logica del controlador de audio"""
         self.axOriginal.clear()
         self.axCensurado.clear()
-        
-        #Le pedimos al controlador de audio que use librosa para dibujar
+
+        # Le pedimos al controlador de audio que use librosa para dibujar   
         self.audioCtrl.graficarAudio(self.axOriginal, tipo=self.modoGrafico, censurado=False)
         self.audioCtrl.graficarAudio(self.axCensurado, tipo=self.modoGrafico, censurado=True)
-            
+
         self.figura.tight_layout()
         self.canvas.draw()
 
@@ -354,10 +359,10 @@ class InterfazAudio(QMainWindow):
             return
         self.actualizarFocos("verde")
         QApplication.processEvents()
-        
+
         self.audioCtrl.reproducirAudioOriginal()
-        
-        #Iniciamos la reproduccion del video
+
+        # Iniciamos la reproduccion del video
         if len(self.audioCtrl.videoFrames) > 0 and self.modoGrafico == "video":
             self.iniciarReproduccionVideo()
 
@@ -367,10 +372,10 @@ class InterfazAudio(QMainWindow):
             return
         self.actualizarFocos("verde")
         QApplication.processEvents()
-        
+
         self.audioCtrl.reproducirAudioCensurado()
-        
-        #Iniciamos la reproduccion del video
+
+        # Iniciamos la reproduccion del video
         if len(self.audioCtrl.videoFrames) > 0 and self.modoGrafico == "video":
             self.iniciarReproduccionVideo()
 
@@ -379,16 +384,16 @@ class InterfazAudio(QMainWindow):
         self.timerVideo.stop()
         self.inicioReproduccion = time.perf_counter()
         self.frameAnteriorMostrado = -1
-        
+
         if self.audioCtrl.fpsVideo > 0:
             # Refrescar muy rapido (ej. cada 15 ms) y buscar el cuadro exacto que corresponde
             self.timerVideo.start(15)
-            
+
     def actualizarFrameVideo(self):
         """Calcula el cuadro exacto según el tiempo transcurrido para forzar sincronía total"""
         tiempoTranscurrido = time.perf_counter() - self.inicioReproduccion
         indiceEsperado = int(tiempoTranscurrido * self.audioCtrl.fpsVideo)
-        
+
         if indiceEsperado < len(self.audioCtrl.videoFrames):
             # Solo actualizar si cambio el indice para no desperdiciar recursos dibujando el mismo cuadro
             if self.frameAnteriorMostrado != indiceEsperado:
@@ -396,7 +401,7 @@ class InterfazAudio(QMainWindow):
                 self.frameAnteriorMostrado = indiceEsperado
         else:
             self.timerVideo.stop()
-            
+
     def mostrarFrame(self, indice):
         """Convierte y dibuja un cuadro de OpenCV en el QLabel de la interfaz"""
         frame = self.audioCtrl.videoFrames[indice]
@@ -406,6 +411,7 @@ class InterfazAudio(QMainWindow):
         pixmap = QPixmap.fromImage(qImg)
         pixmap = pixmap.scaled(self.labelVideo.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
         self.labelVideo.setPixmap(pixmap)
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
